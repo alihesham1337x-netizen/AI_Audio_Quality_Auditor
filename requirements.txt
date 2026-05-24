@@ -1,0 +1,20 @@
+numpy
+scipy
+librosa
+soundfile
+ffmpeg-python
+torch
+streamlit
+pandas
+websocket-client
+# webrtcvad  # optional: install only if you have C++ build tools available
+fastapi
+uvicorn[standard]
+python-multipart
+pytest
+# Optional model / GPU packages
+# silero-vad
+# demucs
+# tensorflow
+# tensorflow_hub
+# openl3

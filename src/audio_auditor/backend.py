@@ -1,15 +1,23 @@
 import os
 import tempfile
 from pathlib import Path
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from typing import List
 
 from .pipeline import AudioAuditPipeline
 
 
-def create_app() -> FastAPI:
+def create_app():
+    """Create the FastAPI app. Only call this when fastapi is installed."""
+    try:
+        from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+        from fastapi.middleware.cors import CORSMiddleware
+        from fastapi.responses import JSONResponse
+    except ImportError:
+        raise ImportError(
+            "fastapi is required to run the API backend. "
+            "Install it with: pip install fastapi uvicorn[standard]"
+        )
+
     app = FastAPI(title="AI Audio Quality Auditor")
     app.add_middleware(
         CORSMiddleware,

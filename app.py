@@ -86,23 +86,45 @@ def inject_css(dark):
   100% {{ background-position: 0% 50%; }}
 }}
 
-.stApp, .main, .block-container {{
-  font-family: 'Inter', sans-serif !important;
-  color: {t1} !important;
-}}
-.stApp {{
+/* ── Force RGB on the actual Streamlit root elements ── */
+html, body, [data-testid="stAppViewContainer"],
+[data-testid="stAppViewBlockContainer"],
+.stApp, .main {{
   background: linear-gradient(
     -45deg,
     {'#07091a, #0d0a2e, #0a1a0d, #1a0a0a, #0a0d1a, #1a0a14, #07091a' if dark else
      '#f0f4ff, #f5f0ff, #fff0f5, #f0fff4, #f0f8ff, #fff5f0, #f0f4ff'}
   ) !important;
   background-size: 400% 400% !important;
-  animation: rgbBg 18s ease infinite !important;
+  animation: rgbBg 6s ease infinite !important;
+}}
+
+/* ── Fixed full-screen overlay for extra depth ── */
+[data-testid="stAppViewContainer"]::before {{
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: linear-gradient(
+    -45deg,
+    {'#07091a, #0d0a2e, #0a1a0d, #1a0a0a, #0a0d1a, #1a0a14, #07091a' if dark else
+     '#f0f4ff, #f5f0ff, #fff0f5, #f0fff4, #f0f8ff, #fff5f0, #f0f4ff'}
+  );
+  background-size: 400% 400%;
+  animation: rgbBg 6s ease infinite;
+}}
+
+.stApp, .main, .block-container {{
+  font-family: 'Inter', sans-serif !important;
+  color: {t1} !important;
 }}
 .block-container {{
   padding: .8rem 1.6rem 2rem !important;
   max-width: 1300px !important;
   background: transparent !important;
+  position: relative;
+  z-index: 1;
 }}
 
 /* ── header ── */
@@ -113,11 +135,11 @@ def inject_css(dark):
   display:flex;align-items:center;justify-content:center;font-size:1.2rem;
   background:linear-gradient(-45deg,#6366f1,#8b5cf6,#ec4899,#ef4444,#eab308,#22c55e,#06b6d4,#6366f1);
   background-size:400% 400%;
-  animation:rgbBtn 6s ease infinite, rgbGlow 6s ease infinite;
+  animation:rgbBtn 3s ease infinite, rgbGlow 3s ease infinite;
 }}
 .aq-title{{
   font-size:1.15rem;font-weight:700;color:{t1};line-height:1;
-  animation:rgbText 8s ease infinite;
+  animation:rgbText 4s ease infinite;
 }}
 .aq-sub{{font-size:.72rem;color:{t2};margin-top:1px}}
 
@@ -127,7 +149,7 @@ hr{{
   height: 1px !important;
   margin: .6rem 0 !important;
   background: linear-gradient(90deg,transparent,currentColor,transparent);
-  animation: rgbText 8s ease infinite;
+  animation: rgbText 4s ease infinite;
   opacity: 0.4;
 }}
 
@@ -135,7 +157,7 @@ hr{{
 .stButton>button, .stDownloadButton>button {{
   background: linear-gradient(-45deg,#6366f1,#8b5cf6,#ec4899,#ef4444,#eab308,#22c55e,#06b6d4,#6366f1) !important;
   background-size: 400% 400% !important;
-  animation: rgbBtn 6s ease infinite !important;
+  animation: rgbBtn 3s ease infinite !important;
   color: #fff !important;
   border: none !important;
   border-radius: 8px !important;
@@ -153,7 +175,7 @@ hr{{
   background: {card} !important;
   border-radius: 10px !important;
   padding: .5rem !important;
-  animation: rgbBorder 8s ease infinite;
+  animation: rgbBorder 4s ease infinite;
 }}
 
 /* ── slider thumb ── */
@@ -170,7 +192,7 @@ hr{{
   font-weight: 600 !important;
   color: {t1} !important;
   padding: .4rem .7rem !important;
-  animation: rgbBorder 8s ease infinite;
+  animation: rgbBorder 4s ease infinite;
 }}
 .streamlit-expanderContent {{
   background: {card} !important;
@@ -180,7 +202,7 @@ hr{{
   border-left: 1px solid;
   border-right: 1px solid;
   border-bottom: 1px solid;
-  animation: rgbBorder 8s ease infinite;
+  animation: rgbBorder 4s ease infinite;
 }}
 
 /* ── decision badges ── */
@@ -452,3 +474,4 @@ if st.session_state.results:
                            file_name="audit_report.csv",
                            mime="text/csv",
                            use_container_width=True)
+

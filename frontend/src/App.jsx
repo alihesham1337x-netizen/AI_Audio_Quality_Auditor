@@ -31,6 +31,22 @@ function App() {
   const [error, setError] = useState(null);
   const [selectedEvents, setSelectedEvents] = useState({});
   const [noiseSensitivity, setNoiseSensitivity] = useState(50);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  useEffect(() => {
+    const storedTheme = window.localStorage.getItem("audioAuditorDarkMode");
+    if (storedTheme) {
+      setIsDarkMode(storedTheme === "true");
+    }
+  }, []);
+
+  const toggleDarkMode = () => {
+    setIsDarkMode((prev) => {
+      const next = !prev;
+      window.localStorage.setItem("audioAuditorDarkMode", next.toString());
+      return next;
+    });
+  };
 
   const handleFiles = (event) => {
     setFiles(Array.from(event.target.files));
@@ -126,11 +142,25 @@ function App() {
     return "severity-low";
   };
 
+  const totalEvents = results?.reduce((sum, result) => sum + result.events.length, 0) ?? 0;
+
   return (
-    <div className="app-container">
+    <div className={`app-container${isDarkMode ? " dark-mode" : ""}`}>
       <header>
-        <h1>AI Audio Quality Auditor</h1>
-        <p>Upload MP3/WAV call recordings for automated noise compliance auditing.</p>
+        <div className="header-row">
+          <div>
+            <h1>AI Audio Quality Auditor</h1>
+            <p>Upload MP3/WAV call recordings for automated noise compliance auditing with agent-side noise detection.</p>
+          </div>
+          <button className="theme-toggle" onClick={toggleDarkMode}>
+            {isDarkMode ? "Light mode" : "Dark mode"}
+          </button>
+        </div>
+        <div className="hero-chips">
+          <span className="hero-chip">Bulk MP3/WAV uploads</span>
+          <span className="hero-chip">Agent-left noise focus</span>
+          <span className="hero-chip">Inline playback + export</span>
+        </div>
       </header>
 
       <section className="upload-card">
@@ -138,6 +168,17 @@ function App() {
           Choose audio files
           <input type="file" accept="audio/mp3,audio/wav" multiple onChange={handleFiles} />
         </label>
+        {files.length ? (
+          <div className="selected-file-list">
+            <h3>Selected files</h3>
+            {files.map((file, idx) => (
+              <div key={idx} className="file-preview">
+                <span>{file.name}</span>
+                <AudioPreview file={file} />
+              </div>
+            ))}
+          </div>
+        ) : null}
         <div className="slider-control">
           <label htmlFor="noise-sensitivity">Background noise sensitivity</label>
           <input
@@ -150,10 +191,11 @@ function App() {
           />
           <span>{noiseSensitivity}%</span>
         </div>
-        <button disabled={!files.length || loading} onClick={submitFiles}>
+        <button className="primary-button" disabled={!files.length || loading} onClick={submitFiles}>
           {loading ? "Processing..." : "Audit files"}
+          {loading ? <span className="loading-spinner" /> : null}
         </button>
-        {files.length ? <p>{files.length} file(s) selected.</p> : null}
+        {files.length ? <p className="selected-count">{files.length} file(s) selected.</p> : null}
       </section>
 
       {error ? <div className="error-card">{error}</div> : null}
@@ -161,12 +203,15 @@ function App() {
       {results ? (
         <section className="results-card">
           <div className="results-header">
-            <h2>Audit Results</h2>
+            <div>
+              <h2>Audit Results</h2>
+              <p className="result-summary">{files.length} uploaded file(s) • {totalEvents} event(s) found</p>
+            </div>
             <div className="export-buttons">
-              <button disabled={loading} onClick={exportResultsJSON}>
+              <button className="secondary-button" disabled={loading} onClick={exportResultsJSON}>
                 Export JSON
               </button>
-              <button disabled={loading} onClick={exportResultsCSV}>
+              <button className="secondary-button" disabled={loading} onClick={exportResultsCSV}>
                 Export CSV
               </button>
             </div>

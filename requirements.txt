@@ -3,10 +3,11 @@ numpy
 scipy
 librosa
 soundfile
-# torch CPU-only — install from PyTorch's CPU index
+
+# ── PyTorch CPU-only (required for Silero VAD) ────────────────────────────────
 --extra-index-url https://download.pytorch.org/whl/cpu
-torch==2.2.2+cpu
-torchaudio==2.2.2+cpu
+torch
+torchaudio
 silero-vad
 
 # ── Streamlit UI ──────────────────────────────────────────────────────────────
@@ -23,9 +24,3 @@ streamlit-lottie
 st-annotated-text
 streamlit-pills
 requests
-
-# ── Optional ML models (uncomment to enable) ─────────────────────────────────
-# tensorflow
-# tensorflow_hub
-# demucs
-# webrtcvad

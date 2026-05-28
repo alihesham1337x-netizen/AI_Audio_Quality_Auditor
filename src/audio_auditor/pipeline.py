@@ -74,48 +74,59 @@ class AudioAuditPipeline:
             if end_sample > start_sample:
                 speech_overlap = float(np.mean(speech_mask[start_sample:end_sample]))
 
-            # Re-label Speech/Silence events as noise when the signal warrants it.
-            # For transient events: use onset score (z-score strength) as the gate
-            #   — transient spikes in quiet regions have low segment RMS but high
-            #     onset scores, so RMS is the wrong gate here.
-            # For noise-floor events: use a low RMS bar since we already confirmed
-            #   elevated noise floor in that region.
-            if label in ("Speech", "Silence"):
+            # Labels that are definitively NOT noise — drop immediately
+            SPEECH_LABELS = {"Speech", "Silence"}
+            # Labels that are definitively noise — keep immediately
+            NOISE_LABELS = {
+                "Dog Barking", "Background Chatter", "Mic Static",
+                "Impact Noise", "Fan/Air Noise", "Music/TV",
+                "Vehicle Noise", "Construction", "Keyboard/Typing",
+                "Other Noise",
+            }
+
+            if label in NOISE_LABELS:
+                # Classifier already identified it as a specific noise type — keep
+                pass
+            elif label in SPEECH_LABELS:
                 is_noise_floor = event.get("detector") == "noise_floor"
-                is_transient = event.get("detector") not in ("noise_floor", "gap_energy")
+                is_speech_spectral = event.get("detector") == "speech_spectral"
+                is_transient = event.get("detector") not in ("noise_floor", "gap_energy", "speech_spectral")
                 score = event.get("score", 0.0)
                 strength = event.get("strength", 0.0)
                 spike_ratio = event.get("spike_ratio", 999.0)
 
                 if is_noise_floor:
-                    # Noise-floor detector already confirmed elevated background
                     label = "Other Noise"
                     confidence = max(confidence, 0.50)
-                elif event.get("detector") == "speech_spectral":
-                    # Spectral analysis of speech confirmed embedded noise
+                elif is_speech_spectral:
                     label = "Other Noise"
                     confidence = max(confidence, 0.48)
                 elif label == "Speech":
-                    # Classifier is confident this is speech — trust it and drop.
-                    # Don't re-label speech as noise regardless of onset score.
+                    # Classifier says Speech — trust it, never re-label
                     continue
                 elif is_transient and score >= 2.0 and spike_ratio <= 3.5:
-                    # Silence segment with a real onset spike that isn't a
-                    # speech onset (low spike_ratio = noise during ongoing audio)
-                    label = "Other Noise"
+                    # Silence segment with real onset spike (not a speech onset)
+                    label = "Impact Noise"
                     confidence = max(confidence, 0.52)
                 elif features.get("rms_mean", 0.0) >= 0.010 and strength >= 0.08:
-                    # Sustained Silence segment with meaningful energy
+                    # Sustained Silence with meaningful energy
                     label = "Other Noise"
                     confidence = max(confidence, 0.52)
                 else:
                     continue
+            else:
+                # Unknown label — treat as Other Noise
+                label = "Other Noise"
+                confidence = max(confidence, 0.45)
 
             # Final guard: drop weak events that are still majority speech.
+            # High-confidence specific noise types bypass this guard.
             if (speech_overlap >= 0.75
                     and confidence < 0.45
                     and event.get("detector") not in ("noise_floor", "speech_spectral")
-                    and event.get("score", 0.0) < 5.0):
+                    and event.get("score", 0.0) < 5.0
+                    and label not in ("Dog Barking", "Impact Noise", "Background Chatter",
+                                      "Mic Static", "Fan/Air Noise")):
                 continue
 
             severity = self.scorer.score_event(label, confidence, features)
@@ -130,6 +141,9 @@ class AudioAuditPipeline:
                 "transient_score": event.get("score", 0.0),
             })
 
+        report = AuditReport(events=events)
+        # Sort events by start time before reporting
+        events = sorted(events, key=lambda e: e["start"])
         report = AuditReport(events=events)
         summary = report.summarize()
 

@@ -13,9 +13,9 @@ except ImportError:
 
 YAMNET_MODEL_HANDLE = "https://tfhub.dev/google/yamnet/1"
 YAMNET_LABELS_PATH = os.path.join(os.path.dirname(__file__), "yamnet_class_map.csv")
-DEFAULT_LABELS = ["Speech", "Dog Barking", "Music", "Television", "Vehicle", "Construction", "Crowd", "Silence", "Other Noise"]
 
 TARGET_CATEGORY_MAP = {
+    # ── Speech (never flagged) ──────────────────────────────────────────────
     "speech": "Speech",
     "child speech": "Speech",
     "conversation": "Speech",
@@ -25,32 +25,79 @@ TARGET_CATEGORY_MAP = {
     "yell": "Speech",
     "whispering": "Speech",
     "laughter": "Speech",
+    # ── Dog / animal ────────────────────────────────────────────────────────
     "dog": "Dog Barking",
     "bark": "Dog Barking",
-    "vehicle": "Vehicle",
-    "car": "Vehicle",
-    "truck": "Vehicle",
-    "bus": "Vehicle",
-    "motorcycle": "Vehicle",
-    "engine": "Vehicle",
-    "music": "Music",
-    "television": "Television",
-    "tv": "Television",
+    "animal": "Dog Barking",
+    "cat": "Dog Barking",
+    # ── Background chatter / crowd ──────────────────────────────────────────
+    "crowd": "Background Chatter",
+    "cheering": "Background Chatter",
+    "chatter": "Background Chatter",
+    "hubbub": "Background Chatter",
+    "children shouting": "Background Chatter",
+    "screaming": "Background Chatter",
+    "baby cry": "Background Chatter",
+    "crying": "Background Chatter",
+    # ── Microphone / audio artifacts ────────────────────────────────────────
+    "static": "Mic Static",
+    "noise": "Mic Static",
+    "hiss": "Mic Static",
+    "hum": "Mic Static",
+    "buzz": "Mic Static",
+    "echo": "Mic Static",
+    "feedback": "Mic Static",
+    "distortion": "Mic Static",
+    "white noise": "Mic Static",
+    "pink noise": "Mic Static",
+    # ── Hits / bangs / impacts ──────────────────────────────────────────────
+    "bang": "Impact Noise",
+    "knock": "Impact Noise",
+    "thud": "Impact Noise",
+    "slam": "Impact Noise",
+    "tap": "Impact Noise",
+    "click": "Impact Noise",
+    "clap": "Impact Noise",
+    "door": "Impact Noise",
+    "glass": "Impact Noise",
+    "drum": "Impact Noise",
+    "percussion": "Impact Noise",
+    "gunshot": "Impact Noise",
+    "explosion": "Impact Noise",
+    # ── Fan / air / HVAC ────────────────────────────────────────────────────
+    "wind": "Fan/Air Noise",
+    "fan": "Fan/Air Noise",
+    "air conditioning": "Fan/Air Noise",
+    "hvac": "Fan/Air Noise",
+    "ventilation": "Fan/Air Noise",
+    "blowing": "Fan/Air Noise",
+    "whoosh": "Fan/Air Noise",
+    # ── Music / TV / media ──────────────────────────────────────────────────
+    "music": "Music/TV",
+    "television": "Music/TV",
+    "tv": "Music/TV",
+    "radio": "Music/TV",
+    "song": "Music/TV",
+    "singing": "Music/TV",
+    # ── Vehicle / outdoor ───────────────────────────────────────────────────
+    "vehicle": "Vehicle Noise",
+    "car": "Vehicle Noise",
+    "truck": "Vehicle Noise",
+    "bus": "Vehicle Noise",
+    "motorcycle": "Vehicle Noise",
+    "engine": "Vehicle Noise",
+    "traffic": "Vehicle Noise",
+    "horn": "Vehicle Noise",
+    # ── Construction / machinery ────────────────────────────────────────────
     "construction": "Construction",
     "jackhammer": "Construction",
     "drilling": "Construction",
-    "crowd": "Crowd",
-    "cheering": "Crowd",
-    "screaming": "Crowd",
-    "children shouting": "Crowd",
-    "baby cry": "Child screaming",
-    "crying": "Child screaming",
-    "glass": "Other Noise",
-    "keyboard": "Keyboard Smash",
-    "typing": "Keyboard Smash",
-    "door knock": "Other Noise",
-    "doorbell": "Other Noise",
-    "alarm": "Other Noise",
+    "saw": "Construction",
+    "machinery": "Construction",
+    # ── Keyboard / typing ───────────────────────────────────────────────────
+    "keyboard": "Keyboard/Typing",
+    "typing": "Keyboard/Typing",
+    # ── Silence ─────────────────────────────────────────────────────────────
     "silence": "Silence",
 }
 
@@ -93,7 +140,6 @@ class EnvironmentalClassifier:
         waveform = audio.astype(np.float32)
         if waveform.ndim > 1:
             waveform = np.mean(waveform, axis=1).astype(np.float32)
-
         try:
             scores, embeddings, spectrogram = self.model(waveform)
             if isinstance(scores, tf.Tensor):
@@ -119,43 +165,101 @@ class EnvironmentalClassifier:
         return None
 
     def _heuristic_label(self, audio: np.ndarray, sample_rate: int):
+        """
+        Heuristic classifier using acoustic features.
+        Targets: Dog Barking, Background Chatter, Mic Static, Impact Noise,
+                 Fan/Air Noise, Music/TV, Vehicle Noise, Construction, Keyboard/Typing.
+        Avoids: normal speech (single speaker, tonal, mid-frequency).
+        """
         rms = float(np.sqrt(np.mean(np.square(audio)) + 1e-12))
         zcr = float(np.mean(np.abs(np.diff(np.sign(audio)))))
 
-        spectrum = np.abs(np.fft.rfft(audio))
-        freqs = np.arange(len(spectrum))
-        total_power = np.sum(spectrum) + 1e-9
-        centroid = float(np.sum(spectrum * freqs) / total_power)
+        # Spectral analysis
+        n_fft = min(len(audio), 2048)
+        spectrum = np.abs(np.fft.rfft(audio, n=n_fft))
+        freqs = np.fft.rfftfreq(n_fft, 1.0 / sample_rate)
+        total_power = np.sum(spectrum ** 2) + 1e-12
 
-        n = len(spectrum)
-        low_energy = float(np.sum(spectrum[: n // 4]))
-        high_energy = float(np.sum(spectrum[n // 4 :]))
-        low_ratio = low_energy / (low_energy + high_energy + 1e-9)
+        # Frequency band energies
+        sub_bass  = float(np.sum(spectrum[freqs < 150]  ** 2) / total_power)   # <150Hz rumble
+        low_mid   = float(np.sum(spectrum[(freqs >= 150) & (freqs < 500)]  ** 2) / total_power)
+        speech_b  = float(np.sum(spectrum[(freqs >= 500) & (freqs < 3000)] ** 2) / total_power)
+        high_freq = float(np.sum(spectrum[freqs >= 3000] ** 2) / total_power)
 
+        # Spectral centroid (frequency-weighted mean)
+        centroid = float(np.sum(spectrum * freqs) / (np.sum(spectrum) + 1e-9))
+
+        # Spectral flatness (geometric/arithmetic mean ratio — 0=tonal, 1=noise)
+        log_mean   = float(np.mean(np.log(spectrum + 1e-12)))
+        arith_mean = float(np.mean(spectrum) + 1e-12)
+        flatness   = float(np.clip(np.exp(log_mean) / arith_mean, 0.0, 1.0))
+
+        # Spectral bandwidth (spread around centroid)
+        bandwidth = float(np.sqrt(np.sum(spectrum ** 2 * (freqs - centroid) ** 2) / total_power))
+
+        # ── Silence ──────────────────────────────────────────────────────────
         if rms < 0.003:
             return "Silence", 0.92
 
-        # Keyboard smash / click: very high ZCR (rapid sign changes) + energy.
-        # Threshold raised to 0.30 — energetic speech sits around 0.05–0.15,
-        # true keyboard/click noise is typically > 0.25.
-        if zcr > 0.30 and rms > 0.025:
-            return "Keyboard Smash", 0.72
+        # ── Impact Noise: hits, bangs, door slams ────────────────────────────
+        # Sharp transient: high sub-bass + low-mid energy, short duration,
+        # moderate-high RMS, low ZCR (not speech-like)
+        if (rms > 0.02
+                and sub_bass + low_mid > 0.45
+                and zcr < 0.12
+                and flatness < 0.15
+                and len(audio) / sample_rate < 0.5):
+            return "Impact Noise", 0.75
 
-        # Broadband noise with energy spread across spectrum
-        if rms > 0.06 and low_ratio < 0.50:
-            return "Crowd", 0.62
+        # ── Dog Barking: periodic bursts, mid-frequency, moderate flatness ───
+        # Dogs bark in 300–2000Hz range with moderate energy variation
+        if (rms > 0.02
+                and speech_b > 0.50
+                and 800 < centroid < 2500
+                and 0.02 < flatness < 0.25
+                and zcr < 0.15):
+            return "Dog Barking", 0.68
 
-        # High centroid + decent RMS → music or TV
-        if centroid > 4500 and rms > 0.04:
-            return "Music", 0.58
+        # ── Fan / Air Noise: continuous broadband low-level hiss ─────────────
+        # High flatness (noise-like), energy spread across all bands,
+        # low-to-moderate RMS, low ZCR
+        if (flatness > 0.25
+                and high_freq > 0.15
+                and zcr < 0.18
+                and rms < 0.06):
+            return "Fan/Air Noise", 0.65
 
-        # Moderate RMS with energy spread → generic background noise
-        if rms > 0.05 and low_ratio < 0.60:
-            return "Other Noise", 0.58
+        # ── Mic Static / Echo: broadband noise, high flatness, any RMS ───────
+        # Very flat spectrum (white/pink noise), high ZCR from rapid fluctuations
+        if flatness > 0.35 and rms > 0.008:
+            return "Mic Static", 0.70
 
-        if rms > 0.10:
-            return "Other Noise", 0.55
+        # ── Background Chatter: multiple voices, broadband, high energy ──────
+        # Multiple speakers → wider bandwidth, higher centroid than single speech,
+        # higher ZCR from overlapping voices
+        if (rms > 0.04
+                and bandwidth > 1200
+                and centroid > 1500
+                and zcr > 0.12):
+            return "Background Chatter", 0.65
 
-        # Default: treat as speech — let the pipeline's strength/rms gate
-        # decide whether to re-label it as noise
-        return "Speech", max(0.30, min(0.55, 0.40 + rms * 2.0))
+        # ── Keyboard / Typing: very high ZCR + moderate energy ───────────────
+        if zcr > 0.28 and rms > 0.020:
+            return "Keyboard/Typing", 0.70
+
+        # ── Music / TV: tonal but wide bandwidth, sustained ──────────────────
+        if centroid > 2000 and bandwidth > 1500 and rms > 0.03:
+            return "Music/TV", 0.60
+
+        # ── Vehicle Noise: low-frequency rumble, sustained ───────────────────
+        if sub_bass + low_mid > 0.55 and rms > 0.03 and len(audio) / sample_rate > 0.3:
+            return "Vehicle Noise", 0.62
+
+        # ── Construction: high energy, broadband, sustained ──────────────────
+        if rms > 0.07 and bandwidth > 1800:
+            return "Construction", 0.60
+
+        # ── Default: Speech ───────────────────────────────────────────────────
+        # Single speaker: energy concentrated in 500–3000Hz, moderate ZCR,
+        # low flatness (tonal), narrow bandwidth
+        return "Speech", max(0.30, min(0.55, 0.40 + rms * 1.5))

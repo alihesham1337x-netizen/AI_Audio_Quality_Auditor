@@ -181,85 +181,110 @@ class EnvironmentalClassifier:
         total_power = np.sum(spectrum ** 2) + 1e-12
 
         # Frequency band energies
-        sub_bass  = float(np.sum(spectrum[freqs < 150]  ** 2) / total_power)   # <150Hz rumble
+        sub_bass  = float(np.sum(spectrum[freqs < 150]  ** 2) / total_power)
         low_mid   = float(np.sum(spectrum[(freqs >= 150) & (freqs < 500)]  ** 2) / total_power)
         speech_b  = float(np.sum(spectrum[(freqs >= 500) & (freqs < 3000)] ** 2) / total_power)
         high_freq = float(np.sum(spectrum[freqs >= 3000] ** 2) / total_power)
 
-        # Spectral centroid (frequency-weighted mean)
+        # Spectral centroid
         centroid = float(np.sum(spectrum * freqs) / (np.sum(spectrum) + 1e-9))
 
-        # Spectral flatness (geometric/arithmetic mean ratio — 0=tonal, 1=noise)
+        # Spectral flatness (0=tonal/speech, 1=noise)
         log_mean   = float(np.mean(np.log(spectrum + 1e-12)))
         arith_mean = float(np.mean(spectrum) + 1e-12)
         flatness   = float(np.clip(np.exp(log_mean) / arith_mean, 0.0, 1.0))
 
-        # Spectral bandwidth (spread around centroid)
-        bandwidth = float(np.sqrt(np.sum(spectrum ** 2 * (freqs - centroid) ** 2) / total_power))
+        # Spectral bandwidth
+        bandwidth = float(np.sqrt(
+            np.sum(spectrum ** 2 * (freqs - centroid) ** 2) / total_power
+        ))
+
+        dur = len(audio) / sample_rate
 
         # ── Silence ──────────────────────────────────────────────────────────
         if rms < 0.003:
             return "Silence", 0.92
 
+        # ── Speech guard — exit early if this looks like normal speech ────────
+        # Normal speech: energy concentrated in 500–3000Hz (speech_b > 0.55),
+        # low flatness (tonal), moderate ZCR, centroid 600–1800Hz.
+        # If these all hold, return Speech immediately — don't try to classify
+        # as noise. This prevents speech from matching noise rules below.
+        is_speech_like = (
+            speech_b > 0.55
+            and flatness < 0.25
+            and 500 < centroid < 2000
+            and zcr < 0.18
+        )
+        if is_speech_like:
+            return "Speech", max(0.35, min(0.60, 0.42 + rms * 1.5))
+
         # ── Impact Noise: hits, bangs, door slams ────────────────────────────
-        # Sharp transient: high sub-bass + low-mid energy, short duration,
-        # moderate-high RMS, low ZCR (not speech-like)
+        # Sharp transient: strong sub-bass + low-mid, short duration,
+        # low ZCR (not speech-like), low flatness (impulsive not broadband)
         if (rms > 0.02
                 and sub_bass + low_mid > 0.45
-                and zcr < 0.12
-                and flatness < 0.15
-                and len(audio) / sample_rate < 0.5):
-            return "Impact Noise", 0.75
+                and zcr < 0.10
+                and flatness < 0.12
+                and dur < 0.5):
+            return "Impact Noise", 0.78
 
-        # ── Dog Barking: periodic bursts, mid-frequency, moderate flatness ───
-        # Dogs bark in 300–2000Hz range with moderate energy variation
-        if (rms > 0.02
-                and speech_b > 0.50
-                and 800 < centroid < 2500
-                and 0.02 < flatness < 0.25
-                and zcr < 0.15):
+        # ── Dog Barking ───────────────────────────────────────────────────────
+        # Dogs bark in 300–2000Hz but with energy ABOVE the speech band too.
+        # Key differentiators from speech:
+        #   - Higher centroid than speech (barks are sharper/higher pitched)
+        #   - Lower speech_b (energy not concentrated in 500–3kHz like speech)
+        #   - Moderate flatness (not as tonal as speech)
+        #   - Short bursts
+        if (rms > 0.025
+                and centroid > 1800          # higher than typical speech
+                and speech_b < 0.55          # NOT speech-band dominant
+                and 0.10 < flatness < 0.40
+                and dur < 1.5):
             return "Dog Barking", 0.68
 
-        # ── Fan / Air Noise: continuous broadband low-level hiss ─────────────
-        # High flatness (noise-like), energy spread across all bands,
+        # ── Fan / Air Noise ───────────────────────────────────────────────────
+        # Continuous broadband hiss: high flatness, energy spread across bands,
         # low-to-moderate RMS, low ZCR
-        if (flatness > 0.25
+        if (flatness > 0.30
                 and high_freq > 0.15
                 and zcr < 0.18
                 and rms < 0.06):
             return "Fan/Air Noise", 0.65
 
-        # ── Mic Static / Echo: broadband noise, high flatness, any RMS ───────
-        # Very flat spectrum (white/pink noise), high ZCR from rapid fluctuations
-        if flatness > 0.35 and rms > 0.008:
+        # ── Mic Static / Echo ─────────────────────────────────────────────────
+        # Very flat spectrum (white/pink noise), any RMS
+        if flatness > 0.40 and rms > 0.008:
             return "Mic Static", 0.70
 
-        # ── Background Chatter: multiple voices, broadband, high energy ──────
-        # Multiple speakers → wider bandwidth, higher centroid than single speech,
-        # higher ZCR from overlapping voices
+        # ── Background Chatter ────────────────────────────────────────────────
+        # Multiple voices: wider bandwidth than single speech,
+        # higher centroid, higher ZCR from overlapping voices
         if (rms > 0.04
-                and bandwidth > 1200
-                and centroid > 1500
-                and zcr > 0.12):
+                and bandwidth > 1400
+                and centroid > 1800
+                and zcr > 0.14):
             return "Background Chatter", 0.65
 
-        # ── Keyboard / Typing: very high ZCR + moderate energy ───────────────
+        # ── Keyboard / Typing ─────────────────────────────────────────────────
         if zcr > 0.28 and rms > 0.020:
             return "Keyboard/Typing", 0.70
 
-        # ── Music / TV: tonal but wide bandwidth, sustained ──────────────────
-        if centroid > 2000 and bandwidth > 1500 and rms > 0.03:
+        # ── Music / TV ────────────────────────────────────────────────────────
+        if centroid > 2200 and bandwidth > 1600 and rms > 0.03:
             return "Music/TV", 0.60
 
-        # ── Vehicle Noise: low-frequency rumble, sustained ───────────────────
-        if sub_bass + low_mid > 0.55 and rms > 0.03 and len(audio) / sample_rate > 0.3:
+        # ── Vehicle Noise ─────────────────────────────────────────────────────
+        # Strong sub-bass + low-mid rumble, sustained, low centroid
+        if (sub_bass + low_mid > 0.55
+                and rms > 0.025
+                and centroid < 1000
+                and dur > 0.3):
             return "Vehicle Noise", 0.62
 
-        # ── Construction: high energy, broadband, sustained ──────────────────
+        # ── Construction ──────────────────────────────────────────────────────
         if rms > 0.07 and bandwidth > 1800:
             return "Construction", 0.60
 
         # ── Default: Speech ───────────────────────────────────────────────────
-        # Single speaker: energy concentrated in 500–3000Hz, moderate ZCR,
-        # low flatness (tonal), narrow bandwidth
         return "Speech", max(0.30, min(0.55, 0.40 + rms * 1.5))

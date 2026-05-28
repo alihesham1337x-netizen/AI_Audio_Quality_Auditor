@@ -39,6 +39,12 @@ Then connect a frontend or send multipart uploads to `/audit`.
 
 The React UI also supports exporting audit results as JSON or CSV.
 
+## Run tests
+
+```bash
+python -m pytest
+```
+
 ## React frontend
 
 A lightweight React UI is available under `frontend/`.

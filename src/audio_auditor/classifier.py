@@ -119,16 +119,43 @@ class EnvironmentalClassifier:
         return None
 
     def _heuristic_label(self, audio: np.ndarray, sample_rate: int):
-        rms = np.sqrt(np.mean(np.square(audio)))
+        rms = float(np.sqrt(np.mean(np.square(audio)) + 1e-12))
         zcr = float(np.mean(np.abs(np.diff(np.sign(audio)))))
+
         spectrum = np.abs(np.fft.rfft(audio))
-        centroid = float(np.sum(spectrum * np.arange(len(spectrum))) / (np.sum(spectrum) + 1e-9))
-        if rms < 0.002:
-            return "Silence", 0.9
-        if zcr > 0.15 and rms > 0.02:
-            return "Keyboard Smash", 0.75
-        if centroid > 4000 and rms > 0.03:
-            return "Crowd", 0.65
-        if rms > 0.05:
+        freqs = np.arange(len(spectrum))
+        total_power = np.sum(spectrum) + 1e-9
+        centroid = float(np.sum(spectrum * freqs) / total_power)
+
+        n = len(spectrum)
+        low_energy = float(np.sum(spectrum[: n // 4]))
+        high_energy = float(np.sum(spectrum[n // 4 :]))
+        low_ratio = low_energy / (low_energy + high_energy + 1e-9)
+
+        if rms < 0.003:
+            return "Silence", 0.92
+
+        # Keyboard smash / click: very high ZCR (rapid sign changes) + energy.
+        # Threshold raised to 0.30 — energetic speech sits around 0.05–0.15,
+        # true keyboard/click noise is typically > 0.25.
+        if zcr > 0.30 and rms > 0.025:
+            return "Keyboard Smash", 0.72
+
+        # Broadband noise with energy spread across spectrum
+        if rms > 0.06 and low_ratio < 0.50:
+            return "Crowd", 0.62
+
+        # High centroid + decent RMS → music or TV
+        if centroid > 4500 and rms > 0.04:
+            return "Music", 0.58
+
+        # Moderate RMS with energy spread → generic background noise
+        if rms > 0.05 and low_ratio < 0.60:
+            return "Other Noise", 0.58
+
+        if rms > 0.10:
             return "Other Noise", 0.55
-        return "Speech", 0.35
+
+        # Default: treat as speech — let the pipeline's strength/rms gate
+        # decide whether to re-label it as noise
+        return "Speech", max(0.30, min(0.55, 0.40 + rms * 2.0))

@@ -1,4 +1,6 @@
 import os
+import tempfile
+from pathlib import Path
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -17,11 +19,12 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     pipeline = AudioAuditPipeline()
-    os.makedirs("./temp_uploads", exist_ok=True)
+    uploads_dir = Path("./temp_uploads")
+    uploads_dir.mkdir(parents=True, exist_ok=True)
 
     @app.post("/audit")
     async def audit_files(
-        files: List[UploadFile] = File(...),
+        files: List[UploadFile] = File(default=[]),
         sensitivity: float = Form(0.5),
     ):
         if not files:
@@ -31,9 +34,10 @@ def create_app() -> FastAPI:
         results = []
         for uploaded in files:
             contents = await uploaded.read()
-            temp_path = os.path.join("./temp_uploads", uploaded.filename)
-            with open(temp_path, "wb") as f:
-                f.write(contents)
+            suffix = Path(uploaded.filename).suffix or ".wav"
+            with tempfile.NamedTemporaryFile(dir=uploads_dir, delete=False, suffix=suffix) as tmp:
+                tmp.write(contents)
+                temp_path = tmp.name
             results.append(pipeline.audit_file(temp_path, sustained_energy_threshold=energy_threshold))
 
         return JSONResponse(content=[result.__dict__ for result in results])

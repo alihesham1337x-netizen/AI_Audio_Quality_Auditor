@@ -8,8 +8,8 @@ venv/
 # Temp uploads
 temp_uploads/
 
-# Streamlit
-.streamlit/
+# Streamlit — ignore secrets but keep config
+.streamlit/secrets.toml
 
 # Node
 frontend/node_modules/

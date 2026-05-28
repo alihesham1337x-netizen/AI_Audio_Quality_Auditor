@@ -5,11 +5,24 @@ try:
 except ImportError:
     webrtcvad = None
 
+# Support both the old 'silero' package and the new 'silero-vad' package
+_silero_model = None
+_silero_get_timestamps = None
+
 try:
     import torch
-    from silero import vad as silero_vad
+    try:
+        # New silero-vad package (pip install silero-vad)
+        from silero_vad import load_silero_vad, get_speech_timestamps
+        _silero_model = load_silero_vad()
+        _silero_get_timestamps = get_speech_timestamps
+    except ImportError:
+        # Old silero package fallback
+        from silero import vad as _old_silero
+        _silero_get_timestamps = _old_silero.get_speech_timestamps
+        _silero_model = True  # placeholder, old API loads model internally
 except Exception:
-    silero_vad = None
+    pass
 
 
 def frame_generator(frame_duration_ms: int, audio: np.ndarray, sample_rate: int):
@@ -39,7 +52,7 @@ def detect_speech_webrtc(audio: np.ndarray, sample_rate: int, frame_ms: int = 30
 
 
 def detect_speech_energy(audio: np.ndarray, sample_rate: int, frame_ms: int = 30, threshold: float = 0.01):
-    """Fallback energy-based speech detection for environments without VAD packages."""
+    """Fallback energy-based speech detection."""
     frame_len = int(sample_rate * frame_ms / 1000.0)
     if frame_len <= 0:
         return np.zeros(len(audio), dtype=bool)
@@ -54,14 +67,27 @@ def detect_speech_energy(audio: np.ndarray, sample_rate: int, frame_ms: int = 30
 
 
 def detect_speech_silero(audio: np.ndarray, sample_rate: int):
-    """Detect speech regions using Silero VAD if available."""
-    if silero_vad is None:
+    """Detect speech regions using Silero VAD."""
+    import torch
+
+    if _silero_model is None or _silero_get_timestamps is None:
         raise RuntimeError("Silero VAD is not available")
     if sample_rate != 16000:
         raise ValueError("Silero VAD expects 16 kHz audio")
 
-    torch_audio = torch.from_numpy(audio).float().unsqueeze(0)
-    speech_timestamps = silero_vad.get_speech_timestamps(torch_audio, sample_rate=sample_rate)
+    wav = torch.from_numpy(audio).float()
+    if wav.dim() == 1:
+        pass  # already 1D
+    else:
+        wav = wav.squeeze()
+
+    # New silero-vad API: pass model explicitly
+    try:
+        speech_timestamps = _silero_get_timestamps(wav, _silero_model, sampling_rate=sample_rate)
+    except TypeError:
+        # Old API fallback
+        speech_timestamps = _silero_get_timestamps(wav, sampling_rate=sample_rate)
+
     mask = np.zeros(len(audio), dtype=bool)
     for segment in speech_timestamps:
         mask[segment["start"]: segment["end"]] = True
@@ -75,21 +101,26 @@ class VoiceActivityDetector:
     def detect_speech(self, audio: np.ndarray, sample_rate: int):
         """Return speech and non-speech boolean masks."""
         speech_mask = None
+
         if self.engine == "silero":
             try:
                 speech_mask = detect_speech_silero(audio, sample_rate)
             except Exception:
                 if webrtcvad is not None:
-                    speech_mask = detect_speech_webrtc(audio, sample_rate)
-                else:
+                    try:
+                        speech_mask = detect_speech_webrtc(audio, sample_rate)
+                    except Exception:
+                        pass
+                if speech_mask is None:
                     speech_mask = detect_speech_energy(audio, sample_rate)
+
         elif self.engine == "webrtc":
             try:
                 speech_mask = detect_speech_webrtc(audio, sample_rate)
             except Exception:
-                if silero_vad is not None:
+                try:
                     speech_mask = detect_speech_silero(audio, sample_rate)
-                else:
+                except Exception:
                     speech_mask = detect_speech_energy(audio, sample_rate)
         else:
             speech_mask = detect_speech_energy(audio, sample_rate)

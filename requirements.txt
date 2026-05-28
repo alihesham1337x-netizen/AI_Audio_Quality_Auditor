@@ -1,20 +1,31 @@
+# ── Core audio processing ─────────────────────────────────────────────────────
 numpy
 scipy
 librosa
 soundfile
-ffmpeg-python
-torch
-streamlit
+# torch CPU-only — install from PyTorch's CPU index
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.2.2+cpu
+torchaudio==2.2.2+cpu
+silero-vad
+
+# ── Streamlit UI ──────────────────────────────────────────────────────────────
+streamlit>=1.32.0
 pandas
-websocket-client
-# webrtcvad  # optional: install only if you have C++ build tools available
-fastapi
-uvicorn[standard]
-python-multipart
-pytest
-# Optional model / GPU packages
-# silero-vad
-# demucs
+
+# ── Visualization ─────────────────────────────────────────────────────────────
+plotly
+altair
+
+# ── UI / styling extras ───────────────────────────────────────────────────────
+streamlit-extras
+streamlit-lottie
+st-annotated-text
+streamlit-pills
+requests
+
+# ── Optional ML models (uncomment to enable) ─────────────────────────────────
 # tensorflow
 # tensorflow_hub
-# openl3
+# demucs
+# webrtcvad

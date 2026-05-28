@@ -26,63 +26,162 @@ LOTTIE = load_lottie("https://assets5.lottiefiles.com/packages/lf20_fcfjwiyb.jso
 
 def inject_css(dark):
     if dark:
-        bg   = "linear-gradient(135deg,#0a0f1e 0%,#0d1530 60%,#080d1a 100%)"
-        card = "rgba(13,20,40,0.88)";  bdr = "rgba(99,102,241,0.22)"
-        t1   = "#e2e8f0";  t2 = "#94a3b8";  acc = "#6366f1";  acc2 = "#8b5cf6"
-        glow = "rgba(99,102,241,0.28)"; mbg = "rgba(99,102,241,0.09)"
-        th   = "rgba(99,102,241,0.18)"; tr = "rgba(13,20,40,0.55)"; ta = "rgba(25,35,60,0.55)"
+        card = "rgba(10,14,30,0.82)";  bdr = "rgba(255,255,255,0.10)"
+        t1   = "#e2e8f0";  t2 = "#94a3b8"
+        tr   = "rgba(10,14,30,0.50)";  ta = "rgba(20,28,55,0.50)"
+        th   = "rgba(255,255,255,0.07)"; mbg = "rgba(255,255,255,0.05)"
         pc   = "#22c55e"; wc = "#f59e0b"; fc = "#ef4444"
+        base_bg = "#07091a"
     else:
-        bg   = "linear-gradient(135deg,#f0f4ff 0%,#eaedff 60%,#f5f0ff 100%)"
-        card = "rgba(255,255,255,0.93)"; bdr = "rgba(99,102,241,0.18)"
-        t1   = "#1e293b"; t2 = "#475569"; acc = "#4f46e5"; acc2 = "#7c3aed"
-        glow = "rgba(99,102,241,0.16)"; mbg = "rgba(99,102,241,0.07)"
-        th   = "rgba(99,102,241,0.1)";  tr = "rgba(255,255,255,0.8)"; ta = "rgba(240,244,255,0.8)"
+        card = "rgba(255,255,255,0.82)"; bdr = "rgba(0,0,0,0.10)"
+        t1   = "#1e293b"; t2 = "#475569"
+        tr   = "rgba(255,255,255,0.75)"; ta = "rgba(240,244,255,0.75)"
+        th   = "rgba(0,0,0,0.06)";       mbg = "rgba(0,0,0,0.04)"
         pc   = "#16a34a"; wc = "#d97706"; fc = "#dc2626"
+        base_bg = "#f0f4ff"
 
     st.markdown(f"""<style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 *,*::before,*::after{{box-sizing:border-box}}
-.stApp,.main,.block-container{{background:{bg}!important;font-family:'Inter',sans-serif!important;color:{t1}!important}}
-.block-container{{padding:.8rem 1.6rem 2rem!important;max-width:1300px!important}}
-.stApp::before{{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
-  background:radial-gradient(ellipse 55% 38% at 18% 8%,{glow},transparent),
-             radial-gradient(ellipse 45% 32% at 82% 82%,rgba(139,92,246,.12),transparent);
-  animation:orb 22s ease-in-out infinite alternate}}
-@keyframes orb{{0%{{transform:translate(0,0)}}100%{{transform:translate(22px,-16px) scale(1.02)}}}}
+
+/* ── RGB / rainbow background ── */
+@keyframes rgbBg {{
+  0%   {{ background-position: 0% 50%; }}
+  50%  {{ background-position: 100% 50%; }}
+  100% {{ background-position: 0% 50%; }}
+}}
+@keyframes rgbBorder {{
+  0%   {{ border-color: rgba(99,102,241,0.55); box-shadow: 0 0 8px rgba(99,102,241,0.3); }}
+  14%  {{ border-color: rgba(139,92,246,0.55); box-shadow: 0 0 8px rgba(139,92,246,0.3); }}
+  28%  {{ border-color: rgba(236,72,153,0.55); box-shadow: 0 0 8px rgba(236,72,153,0.3); }}
+  42%  {{ border-color: rgba(239,68,68,0.55);  box-shadow: 0 0 8px rgba(239,68,68,0.3); }}
+  57%  {{ border-color: rgba(234,179,8,0.55);  box-shadow: 0 0 8px rgba(234,179,8,0.3); }}
+  71%  {{ border-color: rgba(34,197,94,0.55);  box-shadow: 0 0 8px rgba(34,197,94,0.3); }}
+  85%  {{ border-color: rgba(6,182,212,0.55);  box-shadow: 0 0 8px rgba(6,182,212,0.3); }}
+  100% {{ border-color: rgba(99,102,241,0.55); box-shadow: 0 0 8px rgba(99,102,241,0.3); }}
+}}
+@keyframes rgbText {{
+  0%   {{ color: #818cf8; }}
+  14%  {{ color: #a78bfa; }}
+  28%  {{ color: #f472b6; }}
+  42%  {{ color: #f87171; }}
+  57%  {{ color: #fbbf24; }}
+  71%  {{ color: #4ade80; }}
+  85%  {{ color: #22d3ee; }}
+  100% {{ color: #818cf8; }}
+}}
+@keyframes rgbGlow {{
+  0%   {{ box-shadow: 0 4px 20px rgba(99,102,241,0.5); }}
+  14%  {{ box-shadow: 0 4px 20px rgba(139,92,246,0.5); }}
+  28%  {{ box-shadow: 0 4px 20px rgba(236,72,153,0.5); }}
+  42%  {{ box-shadow: 0 4px 20px rgba(239,68,68,0.5); }}
+  57%  {{ box-shadow: 0 4px 20px rgba(234,179,8,0.5); }}
+  71%  {{ box-shadow: 0 4px 20px rgba(34,197,94,0.5); }}
+  85%  {{ box-shadow: 0 4px 20px rgba(6,182,212,0.5); }}
+  100% {{ box-shadow: 0 4px 20px rgba(99,102,241,0.5); }}
+}}
+@keyframes rgbBtn {{
+  0%   {{ background-position: 0% 50%; }}
+  50%  {{ background-position: 100% 50%; }}
+  100% {{ background-position: 0% 50%; }}
+}}
+
+.stApp, .main, .block-container {{
+  font-family: 'Inter', sans-serif !important;
+  color: {t1} !important;
+}}
+.stApp {{
+  background: linear-gradient(
+    -45deg,
+    {'#07091a, #0d0a2e, #0a1a0d, #1a0a0a, #0a0d1a, #1a0a14, #07091a' if dark else
+     '#f0f4ff, #f5f0ff, #fff0f5, #f0fff4, #f0f8ff, #fff5f0, #f0f4ff'}
+  ) !important;
+  background-size: 400% 400% !important;
+  animation: rgbBg 18s ease infinite !important;
+}}
+.block-container {{
+  padding: .8rem 1.6rem 2rem !important;
+  max-width: 1300px !important;
+  background: transparent !important;
+}}
 
 /* ── header ── */
 .aq-hdr{{display:flex;align-items:center;justify-content:space-between;padding:.4rem 0 .2rem}}
 .aq-brand{{display:flex;align-items:center;gap:.6rem}}
-.aq-logo{{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,{acc},{acc2});
-  display:flex;align-items:center;justify-content:center;font-size:1.1rem;
-  box-shadow:0 4px 14px {glow};animation:pulse 3s ease-in-out infinite}}
-@keyframes pulse{{0%,100%{{box-shadow:0 4px 14px {glow}}}50%{{box-shadow:0 4px 22px {acc}88}}}}
-.aq-title{{font-size:1.15rem;font-weight:700;color:{t1};line-height:1}}
+.aq-logo{{
+  width:36px;height:36px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;font-size:1.2rem;
+  background:linear-gradient(-45deg,#6366f1,#8b5cf6,#ec4899,#ef4444,#eab308,#22c55e,#06b6d4,#6366f1);
+  background-size:400% 400%;
+  animation:rgbBtn 6s ease infinite, rgbGlow 6s ease infinite;
+}}
+.aq-title{{
+  font-size:1.15rem;font-weight:700;color:{t1};line-height:1;
+  animation:rgbText 8s ease infinite;
+}}
 .aq-sub{{font-size:.72rem;color:{t2};margin-top:1px}}
 
+/* ── divider with RGB glow ── */
+hr{{
+  border: none !important;
+  height: 1px !important;
+  margin: .6rem 0 !important;
+  background: linear-gradient(90deg,transparent,currentColor,transparent);
+  animation: rgbText 8s ease infinite;
+  opacity: 0.4;
+}}
+
 /* ── buttons ── */
-.stButton>button,.stDownloadButton>button{{
-  background:linear-gradient(135deg,{acc},{acc2})!important;color:#fff!important;
-  border:none!important;border-radius:8px!important;font-weight:600!important;
-  padding:.35rem 1rem!important;font-size:.8rem!important;
-  box-shadow:0 2px 10px {glow}!important;transition:all .18s!important}}
-.stButton>button:hover,.stDownloadButton>button:hover{{transform:translateY(-1px)!important}}
+.stButton>button, .stDownloadButton>button {{
+  background: linear-gradient(-45deg,#6366f1,#8b5cf6,#ec4899,#ef4444,#eab308,#22c55e,#06b6d4,#6366f1) !important;
+  background-size: 400% 400% !important;
+  animation: rgbBtn 6s ease infinite !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 8px !important;
+  font-weight: 600 !important;
+  padding: .35rem 1rem !important;
+  font-size: .8rem !important;
+  transition: transform .18s !important;
+}}
+.stButton>button:hover, .stDownloadButton>button:hover {{
+  transform: translateY(-1px) !important;
+}}
 
 /* ── file uploader ── */
-.stFileUploader{{background:transparent!important;border:1.5px dashed {bdr}!important;
-  border-radius:10px!important;padding:.5rem!important}}
-.stFileUploader:hover{{border-color:{acc}!important}}
+.stFileUploader {{
+  background: {card} !important;
+  border-radius: 10px !important;
+  padding: .5rem !important;
+  animation: rgbBorder 8s ease infinite;
+}}
 
-/* ── slider ── */
-.stSlider [data-baseweb="slider"]{{padding:.3rem 0!important}}
+/* ── slider thumb ── */
+.stSlider [data-baseweb="slider"] {{ padding:.3rem 0 !important }}
+[data-testid="stSlider"] [role="slider"] {{
+  animation: rgbGlow 6s ease infinite;
+}}
 
 /* ── expander ── */
-.streamlit-expanderHeader{{background:{card}!important;border-radius:8px!important;
-  border:1px solid {bdr}!important;font-size:.82rem!important;font-weight:600!important;
-  color:{t1}!important;padding:.4rem .7rem!important}}
-.streamlit-expanderContent{{background:{card}!important;border:1px solid {bdr}!important;
-  border-top:none!important;border-radius:0 0 8px 8px!important;padding:.6rem .7rem!important}}
+.streamlit-expanderHeader {{
+  background: {card} !important;
+  border-radius: 8px !important;
+  font-size: .82rem !important;
+  font-weight: 600 !important;
+  color: {t1} !important;
+  padding: .4rem .7rem !important;
+  animation: rgbBorder 8s ease infinite;
+}}
+.streamlit-expanderContent {{
+  background: {card} !important;
+  border-top: none !important;
+  border-radius: 0 0 8px 8px !important;
+  padding: .6rem .7rem !important;
+  border-left: 1px solid;
+  border-right: 1px solid;
+  border-bottom: 1px solid;
+  animation: rgbBorder 8s ease infinite;
+}}
 
 /* ── decision badges ── */
 .b-pass{{background:{pc}18;color:{pc};border:1px solid {pc}40;border-radius:5px;padding:1px 8px;font-weight:700;font-size:.75rem;white-space:nowrap}}
@@ -110,12 +209,22 @@ def inject_css(dark):
 .aq-sum-item{{display:flex;align-items:center;gap:.3rem;color:{t2}}}
 .aq-sum-val{{font-weight:700;color:{t1}}}
 
+/* ── progress bar ── */
+.stProgress>div>div {{
+  background: linear-gradient(-45deg,#6366f1,#8b5cf6,#ec4899,#22c55e,#06b6d4,#6366f1) !important;
+  background-size: 400% 400% !important;
+  animation: rgbBtn 3s ease infinite !important;
+  border-radius: 3px !important;
+}}
+
 /* ── misc ── */
-hr{{border-color:{bdr}!important;margin:.6rem 0!important}}
 audio{{border-radius:6px!important;width:100%!important;height:32px!important}}
 ::-webkit-scrollbar{{width:4px;height:4px}}
-::-webkit-scrollbar-thumb{{background:{bdr};border-radius:2px}}
-.stProgress>div>div{{background:linear-gradient(90deg,{acc},{acc2})!important;border-radius:3px!important}}
+::-webkit-scrollbar-thumb{{
+  border-radius:2px;
+  background:linear-gradient(180deg,#6366f1,#ec4899,#22c55e);
+  animation:rgbBtn 4s ease infinite;
+}}
 #MainMenu,footer,header{{visibility:hidden}}
 </style>""", unsafe_allow_html=True)
 
